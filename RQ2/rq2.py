@@ -2,86 +2,131 @@ import pandas as pd
 import numpy as np
 import os
 import pickle
-from random import randint
-
-reps = 30
-familys = ['sqlite', 'sac',  'x264', 'spear']
-data_family = {}
-
-for family in familys:
-    files = ['./Data/' + file for file in os.listdir('./Data/') if family in file]
-    data_family[family] = {}
-    for file in files:
-        data_family[family][file] = {}
-        rest = [f for f in files if file!=f]
-        assert(len(rest)+1 == len(files)), "Something is wrong"
-
-        # Read the content of the source
-        source_content = pd.read_csv(file)
-        # Find the column names of the source
-        source_cols = source_content.columns.values.tolist()
-        csource_indep = [c for c in source_cols if '<$' not in c]
-        csource_dep = [c for c in source_cols if '<$' in c]
-        assert(len(csource_dep) == 1), "Something is wrong"
-        csource_dep = csource_dep[0]
-        # Extract the indep and dep columns of the source_content
-        source_indep = source_content[csource_indep]
-        source_dep = source_content[csource_dep]
-
-        for r in rest:
-            print "train: ", file, " test: ", r,
-            data_family[family][file][r] = {}
-            data_family[family][file][r]['source'] = []
-            data_family[family][file][r]['target'] = []
-            for _ in xrange(reps):
-                print ". ",
-                from sklearn.tree import DecisionTreeRegressor
-                tree1 = DecisionTreeRegressor(random_state=randint(0, 100))
-                tree1.fit(source_indep, source_dep)
-
-                target_content = pd.read_csv(r)
-                target_cols = target_content.columns.values.tolist()
-                ctarget_indep = [c for c in target_cols if '<$' not in c]
-                ctarget_dep = [c for c in target_cols if '<$' in c]
-                assert (len(ctarget_dep) == 1), "Something is wrong"
-                ctarget_dep = ctarget_dep[0]
-
-                assert(len(csource_indep) == len(ctarget_indep)), "Somethign is wrong"
-
-                indexes = range(len(target_content))
-                from random import shuffle
-                shuffle(indexes)
-                ttrain_indexes = indexes[:int(len(target_content) * 0.4)]
-                ttest_indexes = indexes[int(len(target_content) * 0.4):]
-
-                ttrain_content = target_content.ix[ttrain_indexes]
-                ttest_content = target_content.ix[ttest_indexes]
-
-                ttrain_indep = ttrain_content[ctarget_indep]
-                ttrain_dep = ttrain_content[ctarget_dep]
-
-                ttest_content = ttest_content.sort(ctarget_dep)
-                ttest_indep = ttest_content[ctarget_indep]
-                ttest_dep = ttest_content[ctarget_dep]
-
-                tree2 = DecisionTreeRegressor(random_state=randint(0, 100))
-                tree2.fit(ttrain_indep, ttrain_dep)
-
-                source_predict_dep = tree1.predict(ttest_indep)
-                source_ranks = [i[0] for i in sorted(enumerate(source_predict_dep), key=lambda x: x[1])]
-                target_predict_dep = tree2.predict(ttest_indep)
-                target_ranks = [i[0] for i in sorted(enumerate(target_predict_dep), key=lambda x: x[1])]
+from sklearn.tree import DecisionTreeRegressor
 
 
+def run(source, targets, reps, measure, perc=0.4):
+    print source
+    data_family = {}
+    for target in targets:
+        train_content = pd.read_csv(source)
+        train_content = shuffle(train_content)
 
-                data_family[family][file][r]['source'].append(source_ranks[0])
-                data_family[family][file][r]['target'].append(target_ranks[0])
+        train_cols = train_content.columns.values.tolist()
+        ctrain_indep = [c for c in train_cols if '<$' not in c]
+        ctrain_dep = [c for c in train_cols if '<$' in c]
+        assert (len(ctrain_dep) == 1), "Something is wrong"
 
-            print
-            print data_family[family][file][r]['source']
-            print data_family[family][file][r]['target']
-            import pdb
-            pdb.set_trace()
-        print "-- " * 20
+        ctrain_dep = ctrain_dep[0]
+        train_indep = train_content[ctrain_indep]
+        train_dep = train_content[ctrain_dep]
 
-    pickle.dump(data_family, open(family + ".p", "wb"))
+        source_name = source.replace('../Data/', '').replace('.csv', '')
+        target_name = target.replace('../Data/', '').replace('.csv', '')
+
+        pickle_folder = './PickleLocker_' + source_name.split('_')[0] + '/'
+        if not os.path.exists(pickle_folder):
+            os.makedirs(pickle_folder)
+        pickle_filename = pickle_folder + source_name + '|' + target_name + '|' + measure + '|' + str(perc * 100) + '.p'
+
+        data_family[source] = {}
+        data_family[source][target] = {}
+        data_family[source][target][measure] = {}
+        data_family[source][target][measure]['bellwether'] = []
+        data_family[source][target][measure]['target'] = []
+
+        # Read target data
+        target_content = pd.read_csv(target)
+        target_cols = target_content.columns.values.tolist()
+        ctarget_indep = [c for c in target_cols if '<$' not in c]
+        ctarget_dep = [c for c in target_cols if '<$' in c]
+        assert (len(ctarget_dep) == 1), "Something is wrong"
+        ctarget_dep = ctarget_dep[0]
+
+        for _ in xrange(reps):
+            print ". ",
+            # Train a model using source data
+            source_model = DecisionTreeRegressor()
+            source_model.fit(train_indep, train_dep)
+
+            # Get indexes to split to train and testing data
+            indexes = range(len(target_content))
+            from random import shuffle
+            shuffle(indexes)
+
+            # Get training and testing indexes to split into train and test
+            target_train_indexes = indexes[:int(len(target_content) * perc)]
+            target_test_indexes = indexes[int(len(target_content) * perc):]
+
+            # Get content based on the indexes generated
+            target_train_content = target_content.ix[target_train_indexes]
+            target_test_content = target_content.ix[target_test_indexes]
+
+            # Get train and test dep and indep
+            target_train_indep = target_train_content[ctarget_indep]
+            target_train_dep = target_train_content[ctarget_dep]
+
+            # Train target model using perc amount of training data
+            target_model = DecisionTreeRegressor()
+            target_model.fit(target_train_indep, target_train_dep)
+
+            # for rank based measures
+            if measure == 'rank':
+                test_content = target_test_content.sort(ctarget_dep)
+                test_indep = test_content[ctarget_indep]
+                test_dep = test_content[ctarget_dep]
+
+                source_test_predict_dep = source_model.predict(test_indep)
+                ranks = [i[0] for i in sorted(enumerate(source_test_predict_dep), key=lambda x: x[1])]
+                data_family[source][target][measure]['bellwether'].append(ranks[0])
+
+                target_test_predict_dep = target_model.predict(test_indep)
+                ranks = [i[0] for i in sorted(enumerate(target_test_predict_dep), key=lambda x: x[1])]
+                data_family[source][target][measure]['target'].append(ranks[0])
+            elif measure == 'mmre':
+                test_indep = target_test_content[ctarget_indep]
+                test_dep = target_test_content[ctarget_dep]
+
+                source_test_predict_dep = source_model.predict(test_indep)
+                data_family[source][target][measure]['bellwether'].append(np.mean(
+                    [abs(actual - predicted) / actual for actual, predicted in zip(test_dep, source_test_predict_dep) if
+                     actual != 0]) * 100)
+
+                target_test_predict_dep = target_model.predict(test_indep)
+                data_family[source][target][measure]['target'].append(np.mean(
+                    [abs(actual - predicted) / actual for actual, predicted in zip(test_dep, target_test_predict_dep) if
+                     actual != 0]) * 100)
+            elif measure == 'abs_res':
+                test_indep = target_test_content[ctarget_indep]
+                test_dep = target_test_content[ctarget_dep]
+
+                source_test_predict_dep = source_model.predict(test_indep)
+                data_family[source][target][measure]['bellwether'].append(
+                    sum([abs(actual - predicted) for actual, predicted in zip(test_dep, source_test_predict_dep)]))
+
+                target_test_predict_dep = target_model.predict(test_indep)
+                data_family[source][target][measure]['target'].append(
+                    sum([abs(actual - predicted) for actual, predicted in zip(test_dep, target_test_predict_dep)]))
+
+        pickle.dump(data_family, open(pickle_filename, 'w'))
+
+
+if __name__ == "__main__":
+    reps = 20
+    familys = ['spear',]# 'sac', 'sqlite',  'x264',  ]
+    measures = ['rank', 'mmre', 'abs_res']
+    data_folder = "../Data/"
+    import multiprocessing as mp
+    # Main control loop
+    pool = mp.Pool()
+    for family in familys:
+        files = [data_folder + file for file in os.listdir(data_folder) if family in file]
+        for measure in measures:
+            for file in files:
+                source = file
+                targets = [f for f in files if file!=f]
+                assert(len(targets) + 1 == len(files)), "Something is wrong"
+                run(source, targets, reps, measure)
+                # pool.apply_async(run, (source, targets, reps, measure))
+    pool.close()
+    pool.join()
