@@ -9,7 +9,7 @@ familys = ['sqlite']
 data_family = {}
 
 for family in familys:
-    files = ['./data/' + file for file in os.listdir('./data/') if family in file]
+    files = ['./Data/' + file for file in os.listdir('./Data/') if family in file]
     data_family[family] = {}
     for file in files:
         data_family[family][file] = {}
