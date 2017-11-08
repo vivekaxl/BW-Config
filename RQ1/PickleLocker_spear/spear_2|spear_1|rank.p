@@ -1,0 +1,14 @@
+(dp0
+S'../Data/spear_2.csv'
+p1
+(dp2
+S'../Data/spear_1.csv'
+p3
+(dp4
+S'rank'
+p5
+(lp6
+I5797
+aI5797
+aI5797
+asss.

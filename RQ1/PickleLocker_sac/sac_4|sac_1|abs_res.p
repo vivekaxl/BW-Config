@@ -1,0 +1,46 @@
+(dp0
+S'../Data/sac_4.csv'
+p1
+(dp2
+S'../Data/sac_1.csv'
+p3
+(dp4
+S'abs_res'
+p5
+(lp6
+cnumpy.core.multiarray
+scalar
+p7
+(cnumpy
+dtype
+p8
+(S'f8'
+p9
+I0
+I1
+tp10
+Rp11
+(I3
+S'<'
+p12
+NNNI-1
+I-1
+I0
+tp13
+bS'\xe0\xd6\xa3\xb0\xa2\x08 A'
+p14
+tp15
+Rp16
+ag7
+(g11
+S'\xa8z\x14\xee\x9d\x03 A'
+p17
+tp18
+Rp19
+ag7
+(g11
+S'i\n\xd7\xe3\x1a\x08 A'
+p20
+tp21
+Rp22
+asss.

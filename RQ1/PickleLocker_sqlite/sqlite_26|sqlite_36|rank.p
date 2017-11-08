@@ -1,0 +1,14 @@
+(dp0
+S'../Data/sqlite_26.csv'
+p1
+(dp2
+S'../Data/sqlite_36.csv'
+p3
+(dp4
+S'rank'
+p5
+(lp6
+I578
+aI578
+aI578
+asss.
