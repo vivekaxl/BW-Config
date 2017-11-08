@@ -1,7 +1,10 @@
+from __future__ import division
 import pandas as pd
 import numpy as np
 import os
 import pickle
+import random
+from sklearn.utils import shuffle
 from sklearn.tree import DecisionTreeRegressor
 
 
@@ -27,13 +30,14 @@ def run(source, targets, reps, measure, perc=0.4):
         pickle_folder = './PickleLocker_' + source_name.split('_')[0] + '/'
         if not os.path.exists(pickle_folder):
             os.makedirs(pickle_folder)
-        pickle_filename = pickle_folder + source_name + '|' + target_name + '|' + measure + '|' + str(perc * 100) + '.p'
+        pickle_filename = pickle_folder + source_name + '|' + target_name + '|' + measure + '|' + str(int(perc * 100)) + '.p'
 
         data_family[source] = {}
         data_family[source][target] = {}
-        data_family[source][target][measure] = {}
-        data_family[source][target][measure]['bellwether'] = []
-        data_family[source][target][measure]['target'] = []
+        data_family[source][target][perc] = {}
+        data_family[source][target][perc][measure] = {}
+        data_family[source][target][perc][measure]['bellwether'] = []
+        data_family[source][target][perc][measure]['target'] = []
 
         # Read target data
         target_content = pd.read_csv(target)
@@ -51,8 +55,7 @@ def run(source, targets, reps, measure, perc=0.4):
 
             # Get indexes to split to train and testing data
             indexes = range(len(target_content))
-            from random import shuffle
-            shuffle(indexes)
+            random.shuffle(indexes)
 
             # Get training and testing indexes to split into train and test
             target_train_indexes = indexes[:int(len(target_content) * perc)]
@@ -78,22 +81,22 @@ def run(source, targets, reps, measure, perc=0.4):
 
                 source_test_predict_dep = source_model.predict(test_indep)
                 ranks = [i[0] for i in sorted(enumerate(source_test_predict_dep), key=lambda x: x[1])]
-                data_family[source][target][measure]['bellwether'].append(ranks[0])
+                data_family[source][target][perc][measure]['bellwether'].append(ranks[0])
 
                 target_test_predict_dep = target_model.predict(test_indep)
                 ranks = [i[0] for i in sorted(enumerate(target_test_predict_dep), key=lambda x: x[1])]
-                data_family[source][target][measure]['target'].append(ranks[0])
+                data_family[source][target][perc][measure]['target'].append(ranks[0])
             elif measure == 'mmre':
                 test_indep = target_test_content[ctarget_indep]
                 test_dep = target_test_content[ctarget_dep]
 
                 source_test_predict_dep = source_model.predict(test_indep)
-                data_family[source][target][measure]['bellwether'].append(np.mean(
+                data_family[source][target][perc][measure]['bellwether'].append(np.mean(
                     [abs(actual - predicted) / actual for actual, predicted in zip(test_dep, source_test_predict_dep) if
                      actual != 0]) * 100)
 
                 target_test_predict_dep = target_model.predict(test_indep)
-                data_family[source][target][measure]['target'].append(np.mean(
+                data_family[source][target][perc][measure]['target'].append(np.mean(
                     [abs(actual - predicted) / actual for actual, predicted in zip(test_dep, target_test_predict_dep) if
                      actual != 0]) * 100)
             elif measure == 'abs_res':
@@ -101,11 +104,11 @@ def run(source, targets, reps, measure, perc=0.4):
                 test_dep = target_test_content[ctarget_dep]
 
                 source_test_predict_dep = source_model.predict(test_indep)
-                data_family[source][target][measure]['bellwether'].append(
+                data_family[source][target][perc][measure]['bellwether'].append(
                     sum([abs(actual - predicted) for actual, predicted in zip(test_dep, source_test_predict_dep)]))
 
                 target_test_predict_dep = target_model.predict(test_indep)
-                data_family[source][target][measure]['target'].append(
+                data_family[source][target][perc][measure]['target'].append(
                     sum([abs(actual - predicted) for actual, predicted in zip(test_dep, target_test_predict_dep)]))
 
         pickle.dump(data_family, open(pickle_filename, 'w'))
@@ -113,8 +116,9 @@ def run(source, targets, reps, measure, perc=0.4):
 
 if __name__ == "__main__":
     reps = 20
-    familys = ['spear',]# 'sac', 'sqlite',  'x264',  ]
+    familys = [ 'sac', 'sqlite',  'x264',]# 'spear',  ]
     measures = ['rank', 'mmre', 'abs_res']
+    percs = [.05, .10, .15, .20, .25, .30, .35, .40]
     data_folder = "../Data/"
     import multiprocessing as mp
     # Main control loop
@@ -122,11 +126,12 @@ if __name__ == "__main__":
     for family in familys:
         files = [data_folder + file for file in os.listdir(data_folder) if family in file]
         for measure in measures:
-            for file in files:
-                source = file
-                targets = [f for f in files if file!=f]
-                assert(len(targets) + 1 == len(files)), "Something is wrong"
-                run(source, targets, reps, measure)
-                # pool.apply_async(run, (source, targets, reps, measure))
+            for perc in percs:
+                for file in files:
+                    source = file
+                    targets = [f for f in files if file!=f]
+                    assert(len(targets) + 1 == len(files)), "Something is wrong"
+                    # run(source, targets, reps, measure, perc)
+                    pool.apply_async(run, (source, targets, reps, measure, perc))
     pool.close()
     pool.join()
