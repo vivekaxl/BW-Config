@@ -76,7 +76,7 @@ def run(source, targets, reps, measure):
 
 if __name__ == "__main__":
     reps = 3
-    familys = ['spear', ]#'sac', 'sqlite',  'x264',  ]
+    familys = ['spear', 'sac', 'sqlite',  'x264',  ]
     measures = ['rank', 'mmre', 'abs_res']
     data_folder = "../Data/"
     import multiprocessing as mp
