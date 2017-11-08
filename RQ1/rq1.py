@@ -5,7 +5,6 @@ import os
 import pickle
 from sklearn.utils import shuffle
 from sklearn.tree import DecisionTreeRegressor
-from random import randint
 
 
 def run(source, targets, reps, measure):
