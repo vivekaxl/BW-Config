@@ -1,9 +1,11 @@
 import pickle
 import os
 
-folders = [d + '/' for d in os.listdir('.') if 'PickleLocker' in d]
-collector = {}
+folders = ['PickleLocker_spear/', 'PickleLocker_sac/',  'PickleLocker_sqlite/', 'PickleLocker_x264/']
+
+
 for folder in folders:
+    collector = {}
     pfiles = [f for f in os.listdir(folder) if '.p' in f]
     for pfile in pfiles:
         tname = pfile.replace('.p', '')
@@ -22,6 +24,7 @@ for folder in folders:
         target_key = content[source_key].keys()[0]
         assert(len(content[source_key][target_key].keys()) == 1), "Something is wrong"
         measure_key = content[source_key][target_key].keys()[0]
+
 
         collector[source_name][target_name][measure] = content[source_key][target_key][measure_key]
 
