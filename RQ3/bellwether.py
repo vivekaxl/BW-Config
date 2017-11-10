@@ -3,7 +3,7 @@ import pandas as pd
 import pickle
 import os
 from os import listdir
-from random import randint
+from random import randint, shuffle
 from sklearn.tree import DecisionTreeRegressor
 
 
@@ -64,6 +64,7 @@ def get_data(filename, seeds):
     # Getting test indexes by removing the train_indexes
     test_indexes = range(pdcontent.shape[0])
     for train_index in sorted(train_indexes, reverse=True): del test_indexes[train_index]
+    shuffle(test_indexes)
     assert(len(train_indexes) + len(test_indexes) == pdcontent.shape[0]), "Somethign is wrong"
 
     content = list()
@@ -133,23 +134,9 @@ def get_top_performing(filename, initial_size):
     return seeds
 
 
-def wrapper_run_active_learning(filename, initial_size, rep, budget):
-    bellwethers = {
-        'sac' : 'sac_5',
-        'spear' : 'spear_7',
-        'x264' : 'x264_9'
-    }
-    print filename, initial_size, rep, budget
-    family = filename.replace('../Data/', '').replace('.csv', '').split('_')[0]
-    system = filename.replace('../Data/', '').replace('.csv', '')
-    if bellwethers[family] == system:
-        # if bellwether then exit
-        return
-    else:
-        # get top performing candidates from the bellwether data
-        bellwether_file = '../Data/' + bellwethers[family] + '.csv'
-        seeds = get_top_performing(bellwether_file, initial_size)
+def wrapper_run_active_learning(filename, seeds, rep, budget):
 
+    print filename, initial_size, rep, budget
     training_set, testing_set= run_active_learning(filename, seeds, budget)
     directory_name = './BWLocker/' + filename.replace('../Data/', '').replace('.csv', '').split('_')[0] + '/'
     if not os.path.exists(directory_name):
@@ -158,12 +145,23 @@ def wrapper_run_active_learning(filename, initial_size, rep, budget):
     pickle.dump([t.rank for t in training_set], open(pickle_file, 'w'))
 
 if __name__ == "__main__":
+    bellwethers = {
+        'sac': 'sac_5',
+        'spear': 'spear_7',
+        'x264': 'x264_9'
+    }
+    seeds_dict = {}
+    initial_size = 20
+    for family in bellwethers.keys():
+        # get top performing candidates from the bellwether data
+        bellwether_file = '../Data/' + bellwethers[family] + '.csv'
+        seeds_dict[family] = get_top_performing(bellwether_file, initial_size)
     import multiprocessing as mp
     # Main control loop
     pool = mp.Pool()
 
     data_folder = "../Data/"
-    filenames = [data_folder+f for f in listdir(data_folder) if '.csv' in f and 'sqlite' not in f ]
+    filenames = [data_folder+f for f in listdir(data_folder) if '.csv' in f and 'sqlite' not in f and 'sac' not in f]
     initial_size = 20
     budgets = [ 30, 40, 50, 60]
     evals_dict = {}
@@ -172,8 +170,14 @@ if __name__ == "__main__":
     for filename in filenames:
         for budget in budgets:
             for rep in xrange(20):
-                pool.apply_async(wrapper_run_active_learning, (filename, initial_size, rep, budget))
-                # wrapper_run_active_learning(filename, initial_size, rep, budget)
+                family = filename.replace('../Data/', '').replace('.csv', '').split('_')[0]
+                system = filename.replace('../Data/', '').replace('.csv', '')
+                if bellwethers[family] == system:
+                    # if bellwether then exit
+                    continue
+                else:
+                    pool.apply_async(wrapper_run_active_learning, (filename, seeds_dict[family], rep, budget))
+                    # wrapper_run_active_learning(filename, seeds_dict[family], rep, budget)
     pool.close()
     pool.join()
 
